@@ -17,6 +17,7 @@ No technology tree; depth comes from resource management and economy.
 | Build | Maven (`pom.xml`) |
 | Package | `com.hexgame` |
 | Resolution | set via `config.properties` (currently 2000×1300) |
+| Distribution | `jpackage` — native installer per platform (bundled JRE, no Java install needed) |
 
 ---
 
@@ -121,9 +122,22 @@ Building efficiency (`buildingEfficiency`) is defined per tile.
 
 ---
 
+## Distribution
+
+- **Tool:** `jpackage` (bundled in JDK 14+), no Maven plugin needed
+- **CI:** GitHub Actions (`.github/workflows/build.yml`), triggered on `v*` tags
+- **Windows:** `.exe` installer with Start Menu entry (`--win-menu --win-dir-chooser`)
+- **macOS:** DMG — disabled for versions `0.x.x` (Apple requires first version number ≥ 1)
+- **Linux:** DEB — disabled for versions `0.x.x` (same policy as macOS for now)
+- **Versioning:** tag `v0.0.3` → installer version `0.0.3`; macOS/Linux require `v1.0.0+`
+- **Actions versions:** `checkout@v6`, `setup-java@v5`, `upload-artifact@v7`
+
+---
+
 ## Next Steps (to discuss)
 
 1. Resource collection mechanic (which tile, how much per turn, does it require a building)
 2. Combat system (Scout vs Scout attacks, BASE capture)
 3. New unit types (warrior? worker?)
 4. AI strategy (map exploration → attack)
+5. Enable macOS + Linux builds when version reaches `v1.0.0`
