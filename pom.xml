@@ -24,6 +24,7 @@
     </dependencies>
 
     <build>
+        <finalName>hex-strategy-game</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
