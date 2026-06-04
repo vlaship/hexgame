@@ -1,0 +1,83 @@
+name: Build Native Installers
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            type: exe
+            artifact: "*.exe"
+          - os: macos-latest
+            type: dmg
+            artifact: "*.dmg"
+          - os: ubuntu-latest
+            type: deb
+            artifact: "*.deb"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Build JAR
+        run: mvn package -DskipTests
+
+      - name: Package installer (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          jpackage `
+            --input target `
+            --name "HexStrategyGame" `
+            --main-jar hex-strategy-game.jar `
+            --main-class com.hexgame.Main `
+            --type exe `
+            --dest target/dist `
+            --app-version 1.0.0 `
+            --java-options "-Dfile.encoding=UTF-8" `
+            --win-menu `
+            --win-dir-chooser
+
+      - name: Package installer (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          jpackage \
+            --input target \
+            --name "HexStrategyGame" \
+            --main-jar hex-strategy-game.jar \
+            --main-class com.hexgame.Main \
+            --type dmg \
+            --dest target/dist \
+            --app-version 1.0.0 \
+            --java-options "-Dfile.encoding=UTF-8"
+
+      - name: Package installer (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          jpackage \
+            --input target \
+            --name "HexStrategyGame" \
+            --main-jar hex-strategy-game.jar \
+            --main-class com.hexgame.Main \
+            --type deb \
+            --dest target/dist \
+            --app-version 1.0.0 \
+            --java-options "-Dfile.encoding=UTF-8" \
+            --linux-shortcut
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: target/dist/${{ matrix.artifact }}
