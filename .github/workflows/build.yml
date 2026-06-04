@@ -18,12 +18,12 @@ jobs:
           - os: windows-latest
             type: exe
             artifact: "*.exe"
-          - os: macos-latest
-            type: dmg
-            artifact: "*.dmg"
-          - os: ubuntu-latest
-            type: deb
-            artifact: "*.deb"
+#          - os: macos-latest
+#            type: dmg
+#            artifact: "*.dmg"
+#          - os: ubuntu-latest
+#            type: deb
+#            artifact: "*.deb"
 
     steps:
       - uses: actions/checkout@v4
@@ -57,32 +57,32 @@ jobs:
             --win-menu `
             --win-dir-chooser
 
-      - name: Package installer (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          jpackage \
-            --input target \
-            --name "HexStrategyGame" \
-            --main-jar hex-strategy-game.jar \
-            --main-class com.hexgame.Main \
-            --type dmg \
-            --dest target/dist \
-            --app-version ${{ steps.version.outputs.VERSION }} \
-            --java-options "-Dfile.encoding=UTF-8"
+#      - name: Package installer (macOS)
+#        if: matrix.os == 'macos-latest'
+#        run: |
+#          jpackage \
+#            --input target \
+#            --name "HexStrategyGame" \
+#            --main-jar hex-strategy-game.jar \
+#            --main-class com.hexgame.Main \
+#            --type dmg \
+#            --dest target/dist \
+#            --app-version ${{ steps.version.outputs.VERSION }} \
+#            --java-options "-Dfile.encoding=UTF-8"
 
-      - name: Package installer (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          jpackage \
-            --input target \
-            --name "HexStrategyGame" \
-            --main-jar hex-strategy-game.jar \
-            --main-class com.hexgame.Main \
-            --type deb \
-            --dest target/dist \
-            --app-version ${{ steps.version.outputs.VERSION }} \
-            --java-options "-Dfile.encoding=UTF-8" \
-            --linux-shortcut
+#      - name: Package installer (Linux)
+#        if: matrix.os == 'ubuntu-latest'
+#        run: |
+#          jpackage \
+#            --input target \
+#            --name "HexStrategyGame" \
+#            --main-jar hex-strategy-game.jar \
+#            --main-class com.hexgame.Main \
+#            --type deb \
+#            --dest target/dist \
+#            --app-version ${{ steps.version.outputs.VERSION }} \
+#            --java-options "-Dfile.encoding=UTF-8" \
+#            --linux-shortcut
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
