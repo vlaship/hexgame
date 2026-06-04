@@ -1,129 +1,129 @@
-# HexGame — Дизайн-заметки (2026-06-03)
+# HexGame — Design Notes (2026-06-03)
 
-## Концепция
+## Concept
 
-Пошаговая 4X-стратегия в космическом сеттинге. 4 игрока (1 человек + 3 ИИ) сражаются за доминирование
-на гексагональной карте из 4 островов. Победа — военная (уничтожить всех врагов).
-Без дерева технологий; глубина — через экономику и управление ресурсами.
+Turn-based 4X strategy set in a sci-fi space theme. 4 players (1 human + 3 AI) compete for dominance
+on a hexagonal map of 4 islands. Victory condition: military (eliminate all enemies).
+No technology tree; depth comes from resource management and economy.
 
 ---
 
-## Технический стек (зафиксирован кодом)
+## Tech Stack (locked by code)
 
-| Параметр | Значение |
+| Parameter | Value |
 |---|---|
-| Язык | Java |
+| Language | Java |
 | UI | Swing + Graphics2D (`javax.swing`, `java.awt`) |
-| Сборка | Maven (`pom.xml`) |
-| Пакет | `com.hexgame` |
-| Разрешение | задаётся в `config.properties` (сейчас 2000×1300) |
+| Build | Maven (`pom.xml`) |
+| Package | `com.hexgame` |
+| Resolution | set via `config.properties` (currently 2000×1300) |
 
 ---
 
-## Конфигурация (`config.properties`)
+## Configuration (`config.properties`)
 
-| Параметр | Текущее значение | Описание |
+| Key | Current Value | Description |
 |---|---|---|
-| `screen.width` | 2000 | Ширина окна в пикселях |
-| `screen.height` | 1300 | Высота окна в пикселях |
-| `camera.up` | `W UP` | Клавиши прокрутки вверх |
-| `camera.down` | `S DOWN` | Клавиши прокрутки вниз |
-| `camera.left` | `A LEFT` | Клавиши прокрутки влево |
-| `camera.right` | `D RIGHT` | Клавиши прокрутки вправо |
+| `screen.width` | 2000 | Window width in pixels |
+| `screen.height` | 1300 | Window height in pixels |
+| `camera.up` | `W UP` | Scroll up keys |
+| `camera.down` | `S DOWN` | Scroll down keys |
+| `camera.left` | `A LEFT` | Scroll left keys |
+| `camera.right` | `D RIGHT` | Scroll right keys |
 
-Ключи задаются именами `KeyEvent.VK_*` без префикса, через пробел (например, `W UP NUMPAD8`).
+Keys are specified as `KeyEvent.VK_*` names without the prefix, space-separated (e.g. `W UP NUMPAD8`).
 
 ---
 
-## Уже реализовано
+## Already Implemented
 
-### Карта
-- Гексагональная сетка 50×32, flat-top
-- Виды тайлов: `OCEAN`, `PLAINS`, `FOREST`, `MOUNTAIN`, `DESERT`, `TUNDRA`, `BASE`
-- Генерация: 4 острова (процедурно по расстоянию от центров)
-- Прокрутка камерой через клавиатуру и edge-scroll мышью
+### Map
+- Hexagonal grid 50×32, flat-top
+- Tile types: `OCEAN`, `PLAINS`, `FOREST`, `MOUNTAIN`, `DESERT`, `TUNDRA`, `BASE`
+- Generation: 4 islands (procedural, distance-based from island centers)
+- Camera scrolling via keyboard and edge-scroll with mouse
 
-### Управление камерой
-- Клавиатура: бинды из `config.properties` (по умолчанию WASD + стрелки)
-- Edge scroll: мышь ближе 40px к краю → камера едет со скоростью 8px/тик (~60fps)
-- Скроллбары в HUD (визуальный индикатор позиции камеры)
+### Camera Controls
+- Keyboard: bindings from `config.properties` (default: WASD + arrow keys)
+- Edge scroll: mouse within 40px of edge → camera moves at 8px/tick (~60fps)
+- Scrollbars in HUD (visual indicator of camera position)
 
-### Туман войны
-- Два состояния на тайл: `isExplored` (открыт) / `isVisible` (в зоне обзора)
-- База игрока открывает 6 гексов вокруг
-- Скауты раскрывают `visionRadius = 4` гексов
-- Тёмные / затенённые тайлы рендерятся по-другому
+### Fog of War
+- Two states per tile: `isExplored` (revealed) / `isVisible` (currently in sight)
+- Player base reveals 6 hexes around it
+- Scouts reveal `visionRadius = 4` hexes
+- Dark / dimmed tiles render differently
 
-### Ресурсы (6 видов)
-Привязаны к тайлам через `yieldXxx`:
+### Resources (6 types)
+Bound to tiles via `yieldXxx` fields:
 
-| Ресурс | Где добывается | Диапазон |
+| Resource | Terrain | Range |
 |---|---|---|
-| Coal | MOUNTAIN | 1.0–2.5 / тайл |
-| Iron (Руда) | MOUNTAIN | 0.7–1.0 / тайл |
-| Wood (Дерево) | FOREST | 3.0–5.5 / тайл |
-| Gold | TUNDRA | 9.0–12.0 / тайл |
-| Uranium | TUNDRA | 0.15–0.50 / тайл |
-| Energy | DESERT | 1.0 (solar) / тайл |
+| Coal | MOUNTAIN | 1.0–2.5 / tile |
+| Iron | MOUNTAIN | 0.7–1.0 / tile |
+| Wood | FOREST | 3.0–5.5 / tile |
+| Gold | TUNDRA | 9.0–12.0 / tile |
+| Uranium | TUNDRA | 0.15–0.50 / tile |
+| Energy | DESERT | 1.0 (solar) / tile |
 
-Банк ресурсов хранится в `PlayerState` (поля `coal`, `gold`, `iron`, `wood`, `uranium`, `energy`).
-Эффективность строений (`buildingEfficiency`) задана per-тайл.
+Resource bank stored in `PlayerState` (fields: `coal`, `gold`, `iron`, `wood`, `uranium`, `energy`).
+Building efficiency (`buildingEfficiency`) is defined per tile.
 
-**! Механизм сбора ресурсов не реализован** — ресурсы не начисляются по ходам.
+**! Resource collection not yet implemented** — yields are not accumulated each turn.
 
-### Юниты
-- Единственный тип: `Scout` — `maxMoves=3`, `visionRadius=4`, `dirIndex` для кругового ИИ
-- HUD: показывает `movesLeft / maxMoves` над выбранным скаутом
-- Pathfinding: BFS, ограничен `movesLeft`, не проходит через OCEAN и неоткрытые тайлы
-- Визуализация пути: пунктирная линия с точками до курсора
+### Units
+- Only type: `Scout` — `maxMoves=3`, `visionRadius=4`, `dirIndex` for circular AI movement
+- HUD: shows `movesLeft / maxMoves` above the selected scout
+- Pathfinding: BFS, limited by `movesLeft`, cannot cross OCEAN or unexplored tiles
+- Path visualization: dashed line with dots to cursor
 
-### Игроки
-- 4 игрока: Player 1 (Human), Player 2-4 (AI)
-- Цвета: жёлтый, красный, зелёный, синий
-- Базы расставлены по четырём углам карты
+### Players
+- 4 players: Player 1 (Human), Player 2–4 (AI)
+- Colors: yellow, red, green, blue
+- Bases placed at the four corners of the map
 
-### Система ходов
-- ENTER — завершить ход человека
-- ИИ делают ход через `javax.swing.Timer` (задержка 1 сек)
-- ИИ-движение: скаут идёт по кругу (6 направлений, `dirIndex` меняется каждый ход; при блокировке — следующее направление)
-- HUD-баннер "Enemy Phase..." во время хода ИИ
-- `completeTurnCycle()` — сброс ходов, обновление тумана
+### Turn System
+- ENTER — end human turn
+- AI takes turn via `javax.swing.Timer` (1 second delay)
+- AI movement: scout moves in a circle (6 directions, `dirIndex` increments each turn; skips blocked directions)
+- HUD banner "Enemy Phase..." during AI turn
+- `completeTurnCycle()` — resets moves, updates fog of war
 
 ### HUD
-- Панель хода (Turn N | имя игрока)
-- Экономическая полоса (Bank: Coal / Gold / Iron / Wood / U-235 / Energy)
-- Панель тайла (тип местности, yields, efficiency) при выделении
-- Скроллбары камеры
+- Turn panel (Turn N | player name)
+- Economy bar (Bank: Coal / Gold / Iron / Wood / U-235 / Energy)
+- Tile info panel (terrain type, yields, efficiency) on selection
+- Camera scrollbars
 
 ---
 
-## Что ещё не реализовано
+## Not Yet Implemented
 
-| Фича | Приоритет | Комментарий |
+| Feature | Priority | Notes |
 |---|---|---|
-| **Сбор ресурсов** | Высокий | Ресурсы не начисляются. Нужна логика в `completeTurnCycle()` |
-| **Боевая система** | Высокий | Нет атаки / урона / захвата баз |
-| **Условие победы** | Высокий | Нет проверки "все враги уничтожены" |
-| **ИИ** | Средний | Круговое движение — заглушка; нужна реальная стратегия |
-| **Другие юниты** | Средний | Только Scout; нужны военные юниты |
-| **Строения** | Средний | `buildingEfficiency` задана, но строить нечего |
-| **Захват базы** | Высокий | Логика перехода BASE между игроками отсутствует |
-| **Сброс ходов ИИ** | Баг | `completeTurnCycle` сбрасывает ходы только Player 1 |
-| **Победный экран** | Низкий | Нет UI для конца игры |
+| **Resource collection** | High | Yields not accumulated. Logic needed in `completeTurnCycle()` |
+| **Combat system** | High | No attack / damage / base capture |
+| **Victory condition** | High | No check for "all enemies eliminated" |
+| **AI** | Medium | Circular movement is a stub; real strategy needed |
+| **Additional units** | Medium | Only Scout exists; military units needed |
+| **Buildings** | Medium | `buildingEfficiency` defined but nothing to build |
+| **Base capture** | High | No logic for transferring BASE ownership between players |
+| **AI move reset** | Bug | `completeTurnCycle` only resets moves for Player 1 |
+| **Victory screen** | Low | No end-game UI |
 
 ---
 
-## Известные баги в коде
+## Known Bugs
 
-1. `completeTurnCycle()` вызывает `u.resetMoves()` только для `ownerIndex == 0` — ИИ-скауты
-   никогда не восстанавливают ходы.
-2. В AI-таймере `while`-цикл прокручивает всех ИИ за один тик, не давая анимации между ними.
+1. `completeTurnCycle()` calls `u.resetMoves()` only for `ownerIndex == 0` — AI scouts
+   never have their moves restored.
+2. The AI timer `while` loop processes all AI players in a single tick, giving no animation between them.
 
 ---
 
-## Следующие шаги (обсудить с пользователем)
+## Next Steps (to discuss)
 
-1. Механизм сбора ресурсов (какой тайл, сколько в ход, нужна ли постройка)
-2. Боевая система (атака Scout vs Scout, захват BASE)
-3. Новые юниты (воин? рабочий?)
-4. ИИ-стратегия (исследование карты → атака)
+1. Resource collection mechanic (which tile, how much per turn, does it require a building)
+2. Combat system (Scout vs Scout attacks, BASE capture)
+3. New unit types (warrior? worker?)
+4. AI strategy (map exploration → attack)
