@@ -128,10 +128,10 @@ class SkyShip extends Unit {
         
         this.maxHp = 200;        
         this.currentHp = 200;
-        this.combatStrength = 40; 
-        this.canAttack = true;
+        this.combatStrength = 0; 
+        this.canAttack = false;
         this.isCivilian = false;
-        this.attackRange = 1;   
+        this.attackRange = 0;   
     }
 }
 

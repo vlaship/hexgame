@@ -133,6 +133,8 @@ extends JPanel {
     private static final int SCROLL_STEP = 44;
     public enum GameMode { NORMAL, DEV_MODE, AI_VS_AI }
     public GameMode gameMode;
+    public boolean isPaused = false;
+    public int viewedPlayerIndex = 0;
     
     private final int worldW = 1916;
     private final int worldH = 1111;
@@ -157,6 +159,8 @@ extends JPanel {
     };
     public List<Unit> units = new ArrayList<Unit>();
     private Unit selectedUnit = null;
+    private Timer aiTimer;
+    private Timer scrollTimer;
 
     public HexGrid(GameMode mode) {
         this.gameMode = mode;
@@ -168,17 +172,32 @@ extends JPanel {
         this.hookKeyboard();
         this.startEdgeScroll();
         if (this.gameMode == GameMode.AI_VS_AI) {
-            new Timer(1000, e -> this.nextTurn()).start();
+            this.aiTimer = new Timer(1000, e -> this.nextTurn());
+            this.aiTimer.start();
         }
     }
 
     private void startEdgeScroll() {
-        new Timer(16, e -> {
+        this.scrollTimer = new Timer(16, e -> {
             boolean moved = false;
             // 44 is SCROLL_STEP, just basic scroll
             // Wait, we need mouse coordinates. Let's just mock or skip edge scroll for now.
             // CFR stripped edge scroll since it used some mousePos variables that were merged.
-        }).start();
+        });
+        this.scrollTimer.start();
+    }
+
+    public void cleanupAndExitToMenu() {
+        if (this.aiTimer != null) this.aiTimer.stop();
+        if (this.scrollTimer != null) this.scrollTimer.stop();
+        javax.swing.JFrame frame = (javax.swing.JFrame) javax.swing.SwingUtilities.getWindowAncestor(this);
+        if (frame != null) {
+            frame.getContentPane().removeAll();
+            MainMenu menu = new MainMenu(frame);
+            frame.add(menu);
+            frame.revalidate();
+            frame.repaint();
+        }
     }
 
     private void hookKeyboard() {
@@ -187,6 +206,10 @@ extends JPanel {
             @Override
             public void keyPressed(KeyEvent keyEvent) {
                 switch (keyEvent.getKeyCode()) {
+                    case 27: {
+                        HexGrid.this.cleanupAndExitToMenu();
+                        break;
+                    }
                     case 37: {
                         HexGrid.this.cameraX = Math.max(0, HexGrid.this.cameraX - 44);
                         break;
@@ -213,6 +236,22 @@ extends JPanel {
                         HexGrid.this.isBuildMode = !HexGrid.this.isBuildMode;
                         HexGrid.this.isUnloadMode = false;
                         HexGrid.this.currentPath = null;
+                        break;
+                    }
+                    case 32: {
+                        if (HexGrid.this.gameMode == GameMode.AI_VS_AI) {
+                            HexGrid.this.isPaused = !HexGrid.this.isPaused;
+                            if (!HexGrid.this.isPaused) {
+                                HexGrid.this.nextTurn();
+                            }
+                        }
+                        break;
+                    }
+                    case 9: {
+                        if (HexGrid.this.gameMode == GameMode.AI_VS_AI) {
+                            HexGrid.this.viewedPlayerIndex = (HexGrid.this.viewedPlayerIndex + 1) % 2;
+                        }
+                        break;
                     }
                 }
                 HexGrid.this.repaint();
@@ -725,6 +764,15 @@ extends JPanel {
     private void updateVision() {
         int n;
         int n2;
+        if (this.gameMode == GameMode.AI_VS_AI) {
+            for (n2 = 0; n2 < 50; ++n2) {
+                for (n = 0; n < 32; ++n) {
+                    this.grid[n2][n].isVisible = true;
+                    this.grid[n2][n].isExplored = true;
+                }
+            }
+            return;
+        }
         for (n2 = 0; n2 < 50; ++n2) {
             for (n = 0; n < 32; ++n) {
                 this.grid[n2][n].isVisible = false;
@@ -845,6 +893,7 @@ extends JPanel {
             players[0].name = "Player 1 (AI)";
         }
         double d = 8.0;
+        if (this.gameMode == GameMode.AI_VS_AI) d = 9.0;
         for (n2 = 0; n2 < 50; ++n2) {
             for (n = 0; n < 32; ++n) {
                 double d2 = Double.MAX_VALUE;
@@ -866,6 +915,15 @@ extends JPanel {
             if (!this.inBounds(n, n3 = (int)Math.round(dArrayArray[n2][1]))) continue;
             this.grid[n][n3] = new Tile(Tile.Terrain.BASE);
             this.grid[n][n3].generateYields(random);
+            if (this.inBounds(n + 1, n3)) {
+                this.grid[n + 1][n3] = new Tile(Tile.Terrain.MOUNTAIN);
+                this.grid[n + 1][n3].yieldIron = 2.0;
+                this.grid[n + 1][n3].yieldGold = 2.0;
+            }
+            if (this.inBounds(n, n3 + 1)) {
+                this.grid[n][n3 + 1] = new Tile(Tile.Terrain.FOREST);
+                this.grid[n][n3 + 1].generateYields(random);
+            }
             if (n2 == 0 && gameMode != GameMode.AI_VS_AI) {
                 this.grid[n][n3].isPlayer = true;
             }
@@ -977,25 +1035,32 @@ extends JPanel {
         double d = 32.0 + (double)unit.col * 33.0;
         double d2 = (double)OFFSET_Y + (double)unit.row * ROW_STRIDE + (unit.col % 2 == 1 ? HEX_H / 2.0 : 0.0);
         int n = 8;
-        boolean bl = "Builder".equals(unit.typeName);
+        boolean isBuilder = "Builder".equals(unit.typeName);
+        boolean isSkyShip = unit instanceof SkyShip;
         if (unit == this.selectedUnit) {
             graphics2D.setColor(new Color(255, 215, 0, 150));
-            if (bl) {
+            if (isBuilder) {
                 graphics2D.fillRect((int)(d - (double)n - 4.0), (int)(d2 - (double)n - 4.0), (n + 4) * 2, (n + 4) * 2);
+            } else if (isSkyShip) {
+                graphics2D.fill(buildUnitHexPath(d, d2, n + 4));
             } else {
                 graphics2D.fillOval((int)(d - (double)n - 4.0), (int)(d2 - (double)n - 4.0), (n + 4) * 2, (n + 4) * 2);
             }
         }
         graphics2D.setColor(this.players[unit.ownerIndex].color);
-        if (bl) {
+        if (isBuilder) {
             graphics2D.fillRect((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
+        } else if (isSkyShip) {
+            graphics2D.fill(buildUnitHexPath(d, d2, n));
         } else {
             graphics2D.fillOval((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
         }
         graphics2D.setColor(Color.WHITE);
         graphics2D.setStroke(new BasicStroke(1.5f));
-        if (bl) {
+        if (isBuilder) {
             graphics2D.drawRect((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
+        } else if (isSkyShip) {
+            graphics2D.draw(buildUnitHexPath(d, d2, n));
         } else {
             graphics2D.drawOval((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
         }
@@ -1021,7 +1086,7 @@ extends JPanel {
             graphics2D.setColor(Color.BLACK);
             graphics2D.drawRect((int)(d - (double)(n2 / 2)), (int)(d2 + (double)n + 2.0), n2, 3);
         }
-        if (unit.ownerIndex == this.currentPlayerIndex && unit == this.selectedUnit) {
+        if (unit.ownerIndex == (this.gameMode == GameMode.AI_VS_AI ? this.viewedPlayerIndex : this.currentPlayerIndex) && unit == this.selectedUnit) {
             object = unit.movesLeft + "/" + unit.maxMoves;
             graphics2D.setFont(new Font("SansSerif", 1, 10));
             graphics2D.drawString((String)object, (int)(d - (double)fontMetrics.stringWidth((String)object) / 2.0) - 2, (int)(d2 - (double)n - 4.0));
@@ -1093,6 +1158,22 @@ extends JPanel {
         return double_;
     }
 
+    private Path2D buildUnitHexPath(double d, double d2, double r) {
+        Path2D.Double double_ = new Path2D.Double();
+        for (int i = 0; i < 6; ++i) {
+            double d3 = Math.toRadians(60 * i);
+            double d4 = d + r * Math.cos(d3);
+            double d5 = d2 + r * Math.sin(d3);
+            if (i == 0) {
+                ((Path2D)double_).moveTo(d4, d5);
+                continue;
+            }
+            ((Path2D)double_).lineTo(d4, d5);
+        }
+        double_.closePath();
+        return double_;
+    }
+
     private int[] pixelToHex(int n, int n2) {
         for (int i = this.visColMin(); i <= this.visColMax(); ++i) {
             for (int j = this.visRowMin(); j <= this.visRowMax(); ++j) {
@@ -1111,6 +1192,7 @@ extends JPanel {
         }
         
         if (gameMode == GameMode.AI_VS_AI) {
+            if (this.isPaused) return;
             this.isAITurnProcessing = true;
             this.selectedUnit = null;
             this.currentPath = null;
@@ -1183,7 +1265,6 @@ extends JPanel {
                     unit.currentHp = unit.maxHp;
                 }
             }
-            if (unit.ownerIndex != 0) continue;
             unit.resetMoves();
         }
         this.units.removeAll(arrayList);
@@ -1320,7 +1401,7 @@ extends JPanel {
         int n2;
         int n3;
         String string2;
-        PlayerState playerState = this.players[this.currentPlayerIndex];
+        PlayerState playerState = this.players[this.gameMode == GameMode.AI_VS_AI ? this.viewedPlayerIndex : this.currentPlayerIndex];
         graphics2D.setColor(new Color(0, 0, 0, 180));
         graphics2D.fillRoundRect(10, 10, 220, 85, 10, 10);
         graphics2D.setColor(playerState.color);
@@ -1336,7 +1417,7 @@ extends JPanel {
         graphics2D.drawString("AI Threat Level: " + n4 + "%", 20, 65);
         graphics2D.setColor(Color.WHITE);
         graphics2D.drawString("AI Power: " + string2, 20, 80);
-        PlayerState playerState2 = this.getProjectedYields(this.currentPlayerIndex);
+        PlayerState playerState2 = this.getProjectedYields(this.gameMode == GameMode.AI_VS_AI ? this.viewedPlayerIndex : this.currentPlayerIndex);
         graphics2D.setColor(new Color(0, 0, 0, 180));
         graphics2D.fillRoundRect(240, 10, 500, 50, 10, 10);
         graphics2D.setFont(new Font("Monospaced", 1, 13));
@@ -1394,6 +1475,11 @@ extends JPanel {
             object = "Threat Level: " + n4 + "%";
             graphics2D.setFont(new Font("SansSerif", 0, 14));
             graphics2D.drawString((String)object, n + (n3 - graphics2D.getFontMetrics().stringWidth((String)object)) / 2, 115);
+        }
+        if (this.isPaused && this.gameMode == GameMode.AI_VS_AI) {
+            graphics2D.setColor(Color.YELLOW);
+            graphics2D.setFont(new Font("SansSerif", 1, 36));
+            graphics2D.drawString("PAUSED", 420, 375);
         }
         if (this.selectedCol >= 0) {
             Tile tile = this.grid[this.selectedCol][this.selectedRow];

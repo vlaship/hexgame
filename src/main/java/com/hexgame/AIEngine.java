@@ -242,17 +242,20 @@ public class AIEngine {
         String targetBuilding = null;
         Tile.Terrain targetTerrain = null;
         
-        if (loggerCount < 1 && p.wood >= 20 && p.iron >= 5) {
+        boolean hasForest = findNearestTerrain(u.col, u.row, Tile.Terrain.FOREST, "LoggerStation") != null;
+        boolean hasMountain = findNearestTerrain(u.col, u.row, Tile.Terrain.MOUNTAIN, "MiningStation") != null;
+        
+        if (loggerCount < 1 && hasForest && p.wood >= 20 && p.iron >= 5) {
             targetBuilding = "LoggerStation"; targetTerrain = Tile.Terrain.FOREST;
-        } else if (minerCount < 1 && p.wood >= 50 && p.iron >= 20) {
+        } else if (minerCount < 1 && hasMountain && p.wood >= 50 && p.iron >= 20) {
             targetBuilding = "MiningStation"; targetTerrain = Tile.Terrain.MOUNTAIN;
         } else if (barracksCount < 1 && p.wood >= 80 && p.iron >= 40 && p.gold >= 30) {
             targetBuilding = "Barracks"; targetTerrain = null;
         } else if (p.energy < 20 && p.wood >= 40 && p.iron >= 20 && p.gold >= 20) {
             targetBuilding = "BurningStation"; targetTerrain = null;
-        } else if (loggerCount < 3 && p.wood >= 20 && p.iron >= 5) {
+        } else if (loggerCount < 3 && hasForest && p.wood >= 20 && p.iron >= 5) {
             targetBuilding = "LoggerStation"; targetTerrain = Tile.Terrain.FOREST;
-        } else if (minerCount < 3 && p.wood >= 50 && p.iron >= 20) {
+        } else if (minerCount < 3 && hasMountain && p.wood >= 50 && p.iron >= 20) {
             targetBuilding = "MiningStation"; targetTerrain = Tile.Terrain.MOUNTAIN;
         } else if (factoryCount < 1 && p.wood >= 120 && p.iron >= 60 && p.gold >= 50) {
             targetBuilding = "VehicleFactory"; targetTerrain = null;
@@ -267,7 +270,15 @@ public class AIEngine {
         if (targetBuilding != null) {
             Tile.Terrain currentT = game.grid[c][r].terrain;
             boolean canBuildHere = game.buildings[c][r] == null && currentT != Tile.Terrain.OCEAN && currentT != Tile.Terrain.BASE;
-            boolean terrainMatches = (targetTerrain == null) || (targetTerrain == currentT);
+            
+            boolean terrainMatches = false;
+            if (targetBuilding.equals("MiningStation")) {
+                terrainMatches = currentT == Tile.Terrain.MOUNTAIN || currentT == Tile.Terrain.TUNDRA;
+            } else if (targetTerrain != null) {
+                terrainMatches = currentT == targetTerrain;
+            } else {
+                terrainMatches = currentT == Tile.Terrain.PLAINS || currentT == Tile.Terrain.DESERT;
+            }
             
             if (canBuildHere && terrainMatches) {
                 if (targetBuilding.equals("LoggerStation")) { p.wood -= 20; p.iron -= 5; game.buildings[c][r] = new LoggerStation(playerIndex); }
@@ -280,7 +291,7 @@ public class AIEngine {
                 u.movesLeft -= 2;
                 return;
             } else {
-                int[] bestTile = findNearestTerrain(u.col, u.row, targetTerrain);
+                int[] bestTile = findNearestTerrain(u.col, u.row, targetTerrain, targetBuilding);
                 if (bestTile != null) {
                     aiMoveTowardsHex(u, bestTile[0], bestTile[1]);
                     return;
@@ -290,24 +301,45 @@ public class AIEngine {
         aiEvadeEnemy(u); 
     }
 
-    private int[] findNearestTerrain(int startCol, int startRow, Tile.Terrain targetTerrain) {
-        int bestCol = -1, bestRow = -1;
-        int minD = Integer.MAX_VALUE;
-        for (int c = 0; c < game.grid.length; c++) {
-            for (int r = 0; r < game.grid[0].length; r++) {
-                if (game.buildings[c][r] == null && game.grid[c][r].terrain != Tile.Terrain.OCEAN && game.grid[c][r].terrain != Tile.Terrain.BASE) {
-                    if (targetTerrain == null || game.grid[c][r].terrain == targetTerrain) {
-                        int d = game.getDistance(startCol, startRow, c, r);
-                        if (d < minD) {
-                            minD = d;
-                            bestCol = c;
-                            bestRow = r;
-                        }
+    private int[] findNearestTerrain(int startCol, int startRow, Tile.Terrain targetTerrain, String targetBuilding) {
+        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        queue.add(new int[]{startCol, startRow});
+        visited.add(startCol + "," + startRow);
+        
+        while (!queue.isEmpty()) {
+            int[] curr = queue.poll();
+            int c = curr[0];
+            int r = curr[1];
+            
+            if (game.buildings[c][r] == null && game.grid[c][r].terrain != Tile.Terrain.OCEAN && game.grid[c][r].terrain != Tile.Terrain.BASE) {
+                boolean matches = false;
+                Tile.Terrain ct = game.grid[c][r].terrain;
+                if (targetBuilding != null && targetBuilding.equals("MiningStation")) {
+                    matches = ct == Tile.Terrain.MOUNTAIN || ct == Tile.Terrain.TUNDRA;
+                } else if (targetTerrain != null) {
+                    matches = ct == targetTerrain;
+                } else {
+                    matches = ct == Tile.Terrain.PLAINS || ct == Tile.Terrain.DESERT;
+                }
+                if (matches) {
+                    return new int[]{c, r};
+                }
+            }
+            
+            for (int[] nb : game.getNeighbors(c, r)) {
+                int nc = nb[0];
+                int nr = nb[1];
+                if (game.inBounds(nc, nr)) {
+                    if (game.grid[nc][nr].terrain == Tile.Terrain.OCEAN) continue;
+                    String key = nc + "," + nr;
+                    if (!visited.contains(key)) {
+                        visited.add(key);
+                        queue.add(new int[]{nc, nr});
                     }
                 }
             }
         }
-        if (bestCol != -1) return new int[]{bestCol, bestRow};
         return null;
     }
 
@@ -350,6 +382,59 @@ public class AIEngine {
         return s;
     }
 
+    private java.util.Set<String> getIslandTiles(int startCol, int startRow) {
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        if (startCol < 0 || startRow < 0) return visited;
+        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+        queue.add(new int[]{startCol, startRow});
+        visited.add(startCol + "," + startRow);
+        
+        while (!queue.isEmpty()) {
+            int[] curr = queue.poll();
+            for (int[] nb : game.getNeighbors(curr[0], curr[1])) {
+                int nc = nb[0], nr = nb[1];
+                if (game.inBounds(nc, nr) && game.grid[nc][nr].terrain != Tile.Terrain.OCEAN) {
+                    String key = nc + "," + nr;
+                    if (!visited.contains(key)) {
+                        visited.add(key);
+                        queue.add(new int[]{nc, nr});
+                    }
+                }
+            }
+        }
+        return visited;
+    }
+
+    private int[] findNearestEmptyLand(int startCol, int startRow) {
+        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        queue.add(new int[]{startCol, startRow});
+        visited.add(startCol + "," + startRow);
+        
+        while (!queue.isEmpty()) {
+            int[] curr = queue.poll();
+            int c = curr[0], r = curr[1];
+            
+            if (game.grid[c][r].terrain != Tile.Terrain.OCEAN && game.getUnitAt(c, r) == null) {
+                return new int[]{c, r};
+            }
+            
+            if (game.getDistance(startCol, startRow, c, r) <= 3) {
+                for (int[] nb : game.getNeighbors(c, r)) {
+                    int nc = nb[0], nr = nb[1];
+                    if (game.inBounds(nc, nr)) {
+                        String key = nc + "," + nr;
+                        if (!visited.contains(key)) {
+                            visited.add(key);
+                            queue.add(new int[]{nc, nr});
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private void managePowerGrid(int playerIndex) {
         HexGrid.PlayerState p = game.players[playerIndex];
         
@@ -387,7 +472,20 @@ public class AIEngine {
         HexGrid.PlayerState p = game.players[playerIndex];
         double myMil = getMilitaryScore(playerIndex);
         double enemyMil = getMilitaryScore(enemyIdx);
-        boolean panic = enemyMil > myMil + 15.0; 
+        boolean panic = enemyMil > myMil + 15.0 && !differentIsland;
+        
+        int factoryCount = 0;
+        for (int c = 0; c < game.grid.length; c++) {
+            for (int r = 0; r < game.grid[0].length; r++) {
+                Building b = game.buildings[c][r];
+                if (b != null && b.ownerIndex == playerIndex && b instanceof VehicleFactory) factoryCount++;
+            }
+        }
+        int skyShipCount = 0;
+        for (Unit u : game.units) {
+            if (u.ownerIndex == playerIndex && u.typeName.equals("Sky Ship")) skyShipCount++;
+        }
+        boolean savingForTech = differentIsland && (factoryCount == 0 || skyShipCount == 0);
 
         for (int c = 0; c < game.grid.length; c++) {
             for (int r = 0; r < game.grid[0].length; r++) {
@@ -424,25 +522,34 @@ public class AIEngine {
                                 p.wood -= 20; p.iron -= 10;
                                 barracks.startTraining("Scout", 2);
                             }
-                        } else if (aggro > 0 || isStaging || differentIsland) {
-                            if (p.wood >= 30 && p.iron >= 20 && p.gold >= 15) {
-                                p.wood -= 30; p.iron -= 20; p.gold -= 15;
-                                barracks.startTraining("Mortar", 3);
-                            } else if (p.wood >= 20 && p.iron >= 30 && p.gold >= 10) {
-                                p.wood -= 20; p.iron -= 30; p.gold -= 10;
-                                barracks.startTraining("Legion", 4);
-                            }
                         } else {
-                            int builderCount = 0;
-                            for (Unit u : game.units) if (u.ownerIndex == playerIndex && u.typeName.equals("Builder")) builderCount++;
+                            int builderCount = 0, legionCount = 0, mortarCount = 0;
+                            for (Unit u : game.units) {
+                                if (u.ownerIndex == playerIndex) {
+                                    if (u.typeName.equals("Builder")) builderCount++;
+                                    else if (u.typeName.equals("Legion")) legionCount++;
+                                    else if (u.typeName.startsWith("Mortar")) mortarCount++;
+                                }
+                            }
+                            
+                            boolean needsMeatShield = legionCount <= mortarCount * 1.5;
                             
                             if (builderCount < 2 && p.wood >= 30 && p.iron >= 10) {
                                 p.wood -= 30; p.iron -= 10;
                                 barracks.startTraining("Builder", 3);
-                            } else {
-                                if (p.wood >= 100 && p.iron >= 100 && p.gold >= 50) {
+                            } else if (!savingForTech) {
+                                if (needsMeatShield && p.wood >= 20 && p.iron >= 30 && p.gold >= 10) {
                                     p.wood -= 20; p.iron -= 30; p.gold -= 10;
                                     barracks.startTraining("Legion", 4);
+                                } else if (!needsMeatShield && p.wood >= 30 && p.iron >= 20 && p.gold >= 15) {
+                                    p.wood -= 30; p.iron -= 20; p.gold -= 15;
+                                    barracks.startTraining("Mortar", 3);
+                                } else if (p.wood >= 20 && p.iron >= 30 && p.gold >= 10) {
+                                    p.wood -= 20; p.iron -= 30; p.gold -= 10;
+                                    barracks.startTraining("Legion", 4);
+                                } else if (p.wood >= 30 && p.iron >= 20 && p.gold >= 15) {
+                                    p.wood -= 30; p.iron -= 20; p.gold -= 15;
+                                    barracks.startTraining("Mortar", 3);
                                 }
                             }
                         }
@@ -457,15 +564,38 @@ public class AIEngine {
 
         int aggro = calculateAIAggressivity(currentPlayerIndex);
         boolean differentIsland = !isSameIslandAsPlayer(currentPlayerIndex);
-        boolean isStaging = getMilitaryScore(currentPlayerIndex) < 40.0; 
+        int enemyIdx = (currentPlayerIndex == 0) ? 1 : 0;
+        double myMil = getMilitaryScore(currentPlayerIndex);
+        double enemyMil = getMilitaryScore(enemyIdx);
+        double bravery = 10.0 + (Math.random() * 20.0);
+        
+        boolean enemyNearHQ = false;
+        Unit myHQBase = getMyHQ(currentPlayerIndex);
+        if (myHQBase != null) {
+            for (Unit u : game.units) {
+                if (u.ownerIndex == enemyIdx && game.getDistance(myHQBase.col, myHQBase.row, u.col, u.row) <= 7) {
+                    enemyNearHQ = true;
+                    break;
+                }
+            }
+        }
+        
+        boolean isDefending = (myMil < enemyMil - 10.0) || enemyNearHQ;
+        boolean isStaging = isDefending || (myMil < 60.0 && myMil < enemyMil + bravery);
+
+        Unit enemyHQBase = getMyHQ(enemyIdx);
+        java.util.Set<String> enemyIslandTiles = new java.util.HashSet<>();
+        if (enemyHQBase != null) {
+            enemyIslandTiles = getIslandTiles(enemyHQBase.col, enemyHQBase.row);
+        }
 
         List<Unit> safeUnitList = new ArrayList<>(game.units);
-        
-        int enemyIdx = (currentPlayerIndex == 0) ? 1 : 0;
         for (Unit u : safeUnitList) {
             if (!game.units.contains(u)) continue;
 
             if (u.ownerIndex == currentPlayerIndex) {
+                if (u instanceof HQ) continue;
+
                 boolean attacked = false;
                 List<Unit> safeTargetList = new ArrayList<>(game.units);
                 
@@ -510,10 +640,17 @@ public class AIEngine {
                         Unit humanHQ = getMyHQ(enemyIdx);
                         if (ship.cargo.size() >= 3 && humanHQ != null) {
                             // Invade
-                            if (game.getDistance(ship.col, ship.row, humanHQ.col, humanHQ.row) <= 3) {
+                            if (game.getDistance(ship.col, ship.row, humanHQ.col, humanHQ.row) <= 4) {
                                 // Unload
                                 for (Unit cargoUnit : ship.cargo) {
-                                    cargoUnit.col = ship.col; cargoUnit.row = ship.row;
+                                    int[] dropTile = findNearestEmptyLand(ship.col, ship.row);
+                                    if (dropTile != null) {
+                                        cargoUnit.col = dropTile[0];
+                                        cargoUnit.row = dropTile[1];
+                                    } else {
+                                        cargoUnit.col = ship.col;
+                                        cargoUnit.row = ship.row;
+                                    }
                                     game.units.add(cargoUnit);
                                 }
                                 ship.cargo.clear();
@@ -526,7 +663,8 @@ public class AIEngine {
                         }
                     } else {
                         // Regular Military
-                        if (differentIsland) {
+                        boolean onEnemyIsland = enemyIslandTiles.contains(u.col + "," + u.row);
+                        if (differentIsland && !onEnemyIsland) {
                             SkyShip transport = getNearestTransport(u);
                             if (transport != null && transport.cargo.size() < transport.capacity) {
                                 if (game.getDistance(u.col, u.row, transport.col, transport.row) <= 1) {
@@ -540,24 +678,66 @@ public class AIEngine {
                             }
                         }
 
-                        if (isStaging) {
+                        if (isDefending) {
+                            Unit myHQ = getMyHQ(u.ownerIndex);
+                            if (myHQ != null) {
+                                if (game.getDistance(u.col, u.row, myHQ.col, myHQ.row) > 3) {
+                                    aiMoveTowards(u, myHQ, 3);
+                                } else {
+                                    aiWander(u);
+                                }
+                            }
+                        } else if (isStaging) {
                             Unit myHQ = getMyHQ(u.ownerIndex);
                             if (myHQ != null && game.getDistance(u.col, u.row, myHQ.col, myHQ.row) > 2) {
                                 aiMoveTowards(u, myHQ, 2); // Stage around HQ
                             } else {
                                 aiWander(u);
                             }
-                        } else if (aggro > 0 || differentIsland) {
-                            Unit target = getClosestPlayerUnit(u.col, u.row, u.ownerIndex);
-                            int idealRange = (u.typeName.equals("Mortar")) ? u.attackRange : 1;
-                            aiMoveTowards(u, target, idealRange);
                         } else {
-                            aiWander(u);
+                            Unit nearestLegion = getNearestFriendly(u, "Legion");
+                            Unit nearestMortar = getNearestFriendly(u, "Mortar");
+                            boolean formingUp = false;
+                            
+                            if (u.typeName.startsWith("Mortar") && nearestLegion != null) {
+                                int dist = game.getDistance(u.col, u.row, nearestLegion.col, nearestLegion.row);
+                                if (dist > 1) {
+                                    aiMoveTowards(u, nearestLegion, 1);
+                                    formingUp = true;
+                                }
+                            } else if (u.typeName.equals("Legion") && nearestMortar != null) {
+                                int dist = game.getDistance(u.col, u.row, nearestMortar.col, nearestMortar.row);
+                                if (dist > 2) {
+                                    aiMoveTowards(u, nearestMortar, 1);
+                                    formingUp = true;
+                                }
+                            }
+                            
+                            if (!formingUp) {
+                                Unit target = getClosestPlayerUnit(u.col, u.row, u.ownerIndex);
+                                int idealRange = (u.typeName.startsWith("Mortar")) ? u.attackRange : 1;
+                                aiMoveTowards(u, target, idealRange);
+                            }
                         }
                     }
                 }
             }
         }
         aiHandleProduction(currentPlayerIndex, aggro, isStaging, differentIsland);
+    }
+
+    private Unit getNearestFriendly(Unit u, String typePrefix) {
+        Unit nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (Unit f : game.units) {
+            if (f.ownerIndex == u.ownerIndex && f != u && f.typeName.startsWith(typePrefix)) {
+                int d = game.getDistance(u.col, u.row, f.col, f.row);
+                if (d < minDist) {
+                    minDist = d;
+                    nearest = f;
+                }
+            }
+        }
+        return nearest;
     }
 }
