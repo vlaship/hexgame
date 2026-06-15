@@ -131,19 +131,14 @@ extends JPanel {
     private int cameraX = 0;
     private int cameraY = 0;
     private static final int SCROLL_STEP = 44;
-    public enum GameMode { NORMAL, DEV_MODE, AI_VS_AI }
-    public GameMode gameMode;
-    public boolean isPaused = false;
-    public int viewedPlayerIndex = 0;
-    
-    private final int worldW = 1916;
-    private final int worldH = 1111;
+    private final int worldW = 1693;
+    private final int worldH = (int)((double)OFFSET_Y + 31.0 * ROW_STRIDE + HEX_H);
     public final Tile[][] grid = new Tile[50][32];
-    public Building[][] buildings = new Building[50][32];
+    public final Building[][] buildings = new Building[50][32];
     private int selectedCol = -1;
     private int selectedRow = -1;
     private List<Point> currentPath = null;
-    private int turnNumber = 1;
+    public int turnNumber = 1;
     private int currentPlayerIndex = 0;
     private boolean isAITurnProcessing = false;
     private boolean isBuildMode = false;
@@ -151,53 +146,17 @@ extends JPanel {
     private Unit unitToUnload = null;
     private SkyShip shipToUnloadFrom = null;
     public AIEngine aiEngine;
-    public final PlayerState[] players = new PlayerState[]{
-        new PlayerState("Player 1 (Human)", new Color(245, 195, 35), false), 
-        new PlayerState("Player 2 (AI)", new Color(255, 100, 100), true), 
-        new PlayerState("Player 3 (AI)", new Color(100, 255, 100), true), 
-        new PlayerState("Player 4 (AI)", new Color(100, 150, 255), true)
-    };
+    public final PlayerState[] players = new PlayerState[]{new PlayerState("Player 1 (Human)", new Color(245, 195, 35), false), new PlayerState("Player 2 (AI)", new Color(255, 100, 100), true), new PlayerState("Player 3 (AI)", new Color(100, 255, 100), true), new PlayerState("Player 4 (AI)", new Color(100, 150, 255), true)};
     public List<Unit> units = new ArrayList<Unit>();
     private Unit selectedUnit = null;
-    private Timer aiTimer;
-    private Timer scrollTimer;
 
-    public HexGrid(GameMode mode) {
-        this.gameMode = mode;
+    public HexGrid() {
         this.aiEngine = new AIEngine(this);
         this.setBackground(new Color(20, 30, 48));
         this.setFocusable(true);
         this.generateMap();
         this.hookMouse();
         this.hookKeyboard();
-        this.startEdgeScroll();
-        if (this.gameMode == GameMode.AI_VS_AI) {
-            this.aiTimer = new Timer(1000, e -> this.nextTurn());
-            this.aiTimer.start();
-        }
-    }
-
-    private void startEdgeScroll() {
-        this.scrollTimer = new Timer(16, e -> {
-            boolean moved = false;
-            // 44 is SCROLL_STEP, just basic scroll
-            // Wait, we need mouse coordinates. Let's just mock or skip edge scroll for now.
-            // CFR stripped edge scroll since it used some mousePos variables that were merged.
-        });
-        this.scrollTimer.start();
-    }
-
-    public void cleanupAndExitToMenu() {
-        if (this.aiTimer != null) this.aiTimer.stop();
-        if (this.scrollTimer != null) this.scrollTimer.stop();
-        javax.swing.JFrame frame = (javax.swing.JFrame) javax.swing.SwingUtilities.getWindowAncestor(this);
-        if (frame != null) {
-            frame.getContentPane().removeAll();
-            MainMenu menu = new MainMenu(frame);
-            frame.add(menu);
-            frame.revalidate();
-            frame.repaint();
-        }
     }
 
     private void hookKeyboard() {
@@ -206,10 +165,6 @@ extends JPanel {
             @Override
             public void keyPressed(KeyEvent keyEvent) {
                 switch (keyEvent.getKeyCode()) {
-                    case 27: {
-                        HexGrid.this.cleanupAndExitToMenu();
-                        break;
-                    }
                     case 37: {
                         HexGrid.this.cameraX = Math.max(0, HexGrid.this.cameraX - 44);
                         break;
@@ -236,22 +191,6 @@ extends JPanel {
                         HexGrid.this.isBuildMode = !HexGrid.this.isBuildMode;
                         HexGrid.this.isUnloadMode = false;
                         HexGrid.this.currentPath = null;
-                        break;
-                    }
-                    case 32: {
-                        if (HexGrid.this.gameMode == GameMode.AI_VS_AI) {
-                            HexGrid.this.isPaused = !HexGrid.this.isPaused;
-                            if (!HexGrid.this.isPaused) {
-                                HexGrid.this.nextTurn();
-                            }
-                        }
-                        break;
-                    }
-                    case 9: {
-                        if (HexGrid.this.gameMode == GameMode.AI_VS_AI) {
-                            HexGrid.this.viewedPlayerIndex = (HexGrid.this.viewedPlayerIndex + 1) % 2;
-                        }
-                        break;
                     }
                 }
                 HexGrid.this.repaint();
@@ -523,16 +462,16 @@ extends JPanel {
             object3 = (BurningStation)building;
             jPopupMenu.addSeparator();
             JMenuItem jMenuItem5 = new JMenuItem("Burn Fuel: COAL");
-            jMenuItem5.setEnabled(((BurningStation)building).activeFuel != BurningStation.FuelType.COAL);
-            jMenuItem5.addActionListener(arg_0 -> this.lambda$showFacilityMenu$8((BurningStation)building, arg_0));
+            jMenuItem5.setEnabled(((BurningStation)object3).activeFuel != BurningStation.FuelType.COAL);
+            jMenuItem5.addActionListener(arg_0 -> this.lambda$showFacilityMenu$8((BurningStation)object3, arg_0));
             jPopupMenu.add(jMenuItem5);
             jMenuItem2 = new JMenuItem("Burn Fuel: WOOD");
-            jMenuItem2.setEnabled(((BurningStation)building).activeFuel != BurningStation.FuelType.WOOD);
-            jMenuItem2.addActionListener(arg_0 -> this.lambda$showFacilityMenu$9((BurningStation)building, arg_0));
+            jMenuItem2.setEnabled(((BurningStation)object3).activeFuel != BurningStation.FuelType.WOOD);
+            jMenuItem2.addActionListener(arg_0 -> this.lambda$showFacilityMenu$9((BurningStation)object3, arg_0));
             jPopupMenu.add(jMenuItem2);
             object2 = new JMenuItem("Power Down (OFF)");
-            ((JMenuItem)object2).setEnabled(((BurningStation)building).activeFuel != BurningStation.FuelType.OFF);
-            ((AbstractButton)object2).addActionListener(arg_0 -> this.lambda$showFacilityMenu$10((BurningStation)building, arg_0));
+            ((JMenuItem)object2).setEnabled(((BurningStation)object3).activeFuel != BurningStation.FuelType.OFF);
+            ((AbstractButton)object2).addActionListener(arg_0 -> this.lambda$showFacilityMenu$10((BurningStation)object3, arg_0));
             jPopupMenu.add((JMenuItem)object2);
         }
         if (building instanceof Barracks && tile.deadZoneTimer == 0) {
@@ -540,32 +479,32 @@ extends JPanel {
             jPopupMenu.addSeparator();
             String string = String.format("Train Scout (2 Pts) [%.0f W, %.0f I]", 20.0, 10.0);
             jMenuItem2 = new JMenuItem(string);
-            jMenuItem2.setEnabled(((Barracks)building).activeProject == null && playerState.wood >= 20.0 && playerState.iron >= 10.0);
-            jMenuItem2.addActionListener(arg_0 -> this.lambda$showFacilityMenu$11(playerState, (Barracks)building, arg_0));
+            jMenuItem2.setEnabled(((Barracks)object3).activeProject == null && playerState.wood >= 20.0 && playerState.iron >= 10.0);
+            jMenuItem2.addActionListener(arg_0 -> this.lambda$showFacilityMenu$11(playerState, (Barracks)object3, arg_0));
             jPopupMenu.add(jMenuItem2);
             object2 = String.format("Train Legion (4 Pts) [%.0f W, %.0f I, %.0f G]", 20.0, 30.0, 10.0);
             jMenuItem = new JMenuItem((String)object2);
-            jMenuItem.setEnabled(((Barracks)building).activeProject == null && playerState.wood >= 20.0 && playerState.iron >= 30.0 && playerState.gold >= 10.0);
-            jMenuItem.addActionListener(arg_0 -> this.lambda$showFacilityMenu$12(playerState, (Barracks)building, arg_0));
+            jMenuItem.setEnabled(((Barracks)object3).activeProject == null && playerState.wood >= 20.0 && playerState.iron >= 30.0 && playerState.gold >= 10.0);
+            jMenuItem.addActionListener(arg_0 -> this.lambda$showFacilityMenu$12(playerState, (Barracks)object3, arg_0));
             jPopupMenu.add(jMenuItem);
             object = String.format("Train Mortar (3 Pts) [%.0f W, %.0f I, %.0f G]", 30.0, 20.0, 15.0);
             JMenuItem jMenuItem6 = new JMenuItem((String)object);
-            jMenuItem6.setEnabled(((Barracks)building).activeProject == null && playerState.wood >= 30.0 && playerState.iron >= 20.0 && playerState.gold >= 15.0);
-            jMenuItem6.addActionListener(arg_0 -> this.lambda$showFacilityMenu$13(playerState, (Barracks)building, arg_0));
+            jMenuItem6.setEnabled(((Barracks)object3).activeProject == null && playerState.wood >= 30.0 && playerState.iron >= 20.0 && playerState.gold >= 15.0);
+            jMenuItem6.addActionListener(arg_0 -> this.lambda$showFacilityMenu$13(playerState, (Barracks)object3, arg_0));
             jPopupMenu.add(jMenuItem6);
             String string2 = String.format("Train Builder (3 Pts) [%.0f W, %.0f I]", 30.0, 10.0);
             JMenuItem jMenuItem7 = new JMenuItem(string2);
-            jMenuItem7.setEnabled(((Barracks)building).activeProject == null && playerState.wood >= 30.0 && playerState.iron >= 10.0);
-            jMenuItem7.addActionListener(arg_0 -> this.lambda$showFacilityMenu$14(playerState, (Barracks)building, arg_0));
+            jMenuItem7.setEnabled(((Barracks)object3).activeProject == null && playerState.wood >= 30.0 && playerState.iron >= 10.0);
+            jMenuItem7.addActionListener(arg_0 -> this.lambda$showFacilityMenu$14(playerState, (Barracks)object3, arg_0));
             jPopupMenu.add(jMenuItem7);
             String string3 = String.format("Train Nuke Carrier (8 Pts) [%.0f W, %.0f I, %.0f U]", 50.0, 50.0, 50.0);
             JMenuItem jMenuItem8 = new JMenuItem(string3);
-            jMenuItem8.setEnabled(((Barracks)building).activeProject == null && playerState.wood >= 50.0 && playerState.iron >= 50.0 && playerState.uranium >= 50.0);
-            jMenuItem8.addActionListener(arg_0 -> this.lambda$showFacilityMenu$15(playerState, (Barracks)building, arg_0));
+            jMenuItem8.setEnabled(((Barracks)object3).activeProject == null && playerState.wood >= 50.0 && playerState.iron >= 50.0 && playerState.uranium >= 50.0);
+            jMenuItem8.addActionListener(arg_0 -> this.lambda$showFacilityMenu$15(playerState, (Barracks)object3, arg_0));
             jPopupMenu.add(jMenuItem8);
-            if (((Barracks)building).activeProject != null) {
+            if (((Barracks)object3).activeProject != null) {
                 JMenuItem jMenuItem9 = new JMenuItem("Cancel Current Queue (No Refund)");
-                jMenuItem9.addActionListener(arg_0 -> this.lambda$showFacilityMenu$16((Barracks)building, arg_0));
+                jMenuItem9.addActionListener(arg_0 -> this.lambda$showFacilityMenu$16((Barracks)object3, arg_0));
                 jPopupMenu.add(jMenuItem9);
             }
         }
@@ -574,17 +513,17 @@ extends JPanel {
             jPopupMenu.addSeparator();
             String string = String.format("Build Tank (8 Pts) [%.0f I, %.0f G]", 80.0, 40.0);
             jMenuItem2 = new JMenuItem(string);
-            jMenuItem2.setEnabled(((VehicleFactory)building).activeProject == null && playerState.iron >= 80.0 && playerState.gold >= 40.0);
-            jMenuItem2.addActionListener(arg_0 -> this.lambda$showFacilityMenu$17(playerState, (VehicleFactory)building, arg_0));
+            jMenuItem2.setEnabled(((VehicleFactory)object3).activeProject == null && playerState.iron >= 80.0 && playerState.gold >= 40.0);
+            jMenuItem2.addActionListener(arg_0 -> this.lambda$showFacilityMenu$17(playerState, (VehicleFactory)object3, arg_0));
             jPopupMenu.add(jMenuItem2);
             object2 = String.format("Build Sky Ship (6 Pts) [%.0f I, %.0f G]", 60.0, 30.0);
             jMenuItem = new JMenuItem((String)object2);
-            jMenuItem.setEnabled(((VehicleFactory)building).activeProject == null && playerState.iron >= 60.0 && playerState.gold >= 30.0);
-            jMenuItem.addActionListener(arg_0 -> this.lambda$showFacilityMenu$18(playerState, (VehicleFactory)building, arg_0));
+            jMenuItem.setEnabled(((VehicleFactory)object3).activeProject == null && playerState.iron >= 60.0 && playerState.gold >= 30.0);
+            jMenuItem.addActionListener(arg_0 -> this.lambda$showFacilityMenu$18(playerState, (VehicleFactory)object3, arg_0));
             jPopupMenu.add(jMenuItem);
-            if (((VehicleFactory)building).activeProject != null) {
+            if (((VehicleFactory)object3).activeProject != null) {
                 object = new JMenuItem("Cancel Current Queue (No Refund)");
-                ((AbstractButton)object).addActionListener(arg_0 -> this.lambda$showFacilityMenu$19((VehicleFactory)building, arg_0));
+                ((AbstractButton)object).addActionListener(arg_0 -> this.lambda$showFacilityMenu$19((VehicleFactory)object3, arg_0));
                 jPopupMenu.add((JMenuItem)object);
             }
         }
@@ -628,16 +567,15 @@ extends JPanel {
                     int n2 = nArray[0];
                     int n3 = nArray[1];
                     if (mouseEvent.getClickCount() == 2) {
-                        final Unit f_unit2 = HexGrid.this.getUnitAt(n2, n3);
-                        unit2 = f_unit2;
-                        if (f_unit2 instanceof NukeCarrier && unit2.ownerIndex == HexGrid.this.currentPlayerIndex) {
+                        unit2 = HexGrid.this.getUnitAt(n2, n3);
+                        if (unit2 instanceof NukeCarrier && unit2.ownerIndex == HexGrid.this.currentPlayerIndex) {
                             JPopupMenu jPopupMenu = new JPopupMenu("Tactical Weapon");
                             JMenuItem jMenuItem = new JMenuItem("DETONATE WARHEAD");
                             jMenuItem.setForeground(Color.RED);
                             jMenuItem.setFont(new Font("SansSerif", 1, 12));
                             jMenuItem.addActionListener(actionEvent -> {
                                 HexGrid.this.detonateNuke(n2, n3);
-                                HexGrid.this.units.remove(f_unit2);
+                                HexGrid.this.units.remove(unit2);
                                 HexGrid.this.selectedUnit = null;
                                 HexGrid.this.updateVision();
                                 HexGrid.this.repaint();
@@ -697,8 +635,7 @@ extends JPanel {
                         HexGrid.this.repaint();
                         return;
                     }
-                    final Unit f_unit2 = HexGrid.this.getUnitAt(n2, n3);
-                        unit2 = f_unit2;
+                    unit2 = HexGrid.this.getUnitAt(n2, n3);
                     if (HexGrid.this.selectedUnit != null && HexGrid.this.selectedUnit.ownerIndex == HexGrid.this.currentPlayerIndex && unit2 != null && unit2.ownerIndex != HexGrid.this.currentPlayerIndex && (n = HexGrid.this.getDistance(HexGrid.this.selectedUnit.col, HexGrid.this.selectedUnit.row, n2, n3)) <= HexGrid.this.selectedUnit.attackRange && HexGrid.this.selectedUnit.canAttack && HexGrid.this.selectedUnit.movesLeft >= 1) {
                         --HexGrid.this.selectedUnit.movesLeft;
                         HexGrid.this.resolveCombat(HexGrid.this.selectedUnit, unit2, n);
@@ -764,15 +701,6 @@ extends JPanel {
     private void updateVision() {
         int n;
         int n2;
-        if (this.gameMode == GameMode.AI_VS_AI) {
-            for (n2 = 0; n2 < 50; ++n2) {
-                for (n = 0; n < 32; ++n) {
-                    this.grid[n2][n].isVisible = true;
-                    this.grid[n2][n].isExplored = true;
-                }
-            }
-            return;
-        }
         for (n2 = 0; n2 < 50; ++n2) {
             for (n = 0; n < 32; ++n) {
                 this.grid[n2][n].isVisible = false;
@@ -847,11 +775,13 @@ extends JPanel {
         while (!linkedList.isEmpty()) {
             point = (Point)linkedList.poll();
             if (point.x == n3 && point.y == n4) break;
-            for (int[] nextObj : this.getNeighbors(point.x, point.y)) {
+            object2 = this.getNeighbors(point.x, point.y).iterator();
+            while (object2.hasNext()) {
                 Point point3;
                 int n7;
                 Unit unit3;
-                if (!this.grid[nextObj[0]][nextObj[1]].isExplored || !bl && this.grid[nextObj[0]][nextObj[1]].terrain == Tile.Terrain.OCEAN || (unit3 = this.getUnitAt((int)nextObj[0], (int)nextObj[1])) != null && unit3.ownerIndex != n6 || (n7 = (Integer)hashMap2.get(point) + 1) > n5 || hashMap2.containsKey(point3 = new Point((int)nextObj[0], (int)nextObj[1])) && n7 >= (Integer)hashMap2.get(point3)) continue;
+                object = (int[])object2.next();
+                if (!this.grid[object[0]][object[1]].isExplored || !bl && this.grid[object[0]][object[1]].terrain == Tile.Terrain.OCEAN || (unit3 = this.getUnitAt((int)object[0], (int)object[1])) != null && unit3.ownerIndex != n6 || (n7 = (Integer)hashMap2.get(point) + 1) > n5 || hashMap2.containsKey(point3 = new Point((int)object[0], (int)object[1])) && n7 >= (Integer)hashMap2.get(point3)) continue;
                 hashMap2.put(point3, n7);
                 hashMap.put(point3, point);
                 linkedList.add(point3);
@@ -860,14 +790,14 @@ extends JPanel {
         if (!hashMap.containsKey(point = new Point(n3, n4))) {
             return null;
         }
-        List<Point> finalPath = new ArrayList<Point>();
-        Point pt = point;
-        while (pt != null && !pt.equals(point2)) {
-            finalPath.add(pt);
-            pt = (Point)hashMap.get(pt);
+        object2 = new ArrayList();
+        object = point;
+        while (object != null && !((Point)object).equals(point2)) {
+            object2.add(object);
+            object = (Point)hashMap.get(object);
         }
-        Collections.reverse(finalPath);
-        return finalPath;
+        Collections.reverse(object2);
+        return object2;
     }
 
     private void generateMap() {
@@ -880,20 +810,7 @@ extends JPanel {
             }
         }
         double[][] dArrayArray = new double[][]{{11.0, 8.64}, {39.0, 8.64}, {11.0, 23.36}, {39.0, 23.36}};
-        
-        if (gameMode == GameMode.DEV_MODE) {
-            dArrayArray = new double[][]{{20.0, 16.0}, {30.0, 16.0}};
-            players[0].wood = 9999;
-            players[0].iron = 9999;
-            players[0].gold = 9999;
-            players[0].uranium = 9999;
-        } else if (gameMode == GameMode.AI_VS_AI) {
-            dArrayArray = new double[][]{{15.0, 16.0}, {35.0, 16.0}};
-            players[0].isAI = true;
-            players[0].name = "Player 1 (AI)";
-        }
         double d = 8.0;
-        if (this.gameMode == GameMode.AI_VS_AI) d = 9.0;
         for (n2 = 0; n2 < 50; ++n2) {
             for (n = 0; n < 32; ++n) {
                 double d2 = Double.MAX_VALUE;
@@ -915,27 +832,11 @@ extends JPanel {
             if (!this.inBounds(n, n3 = (int)Math.round(dArrayArray[n2][1]))) continue;
             this.grid[n][n3] = new Tile(Tile.Terrain.BASE);
             this.grid[n][n3].generateYields(random);
-            if (this.inBounds(n + 1, n3)) {
-                this.grid[n + 1][n3] = new Tile(Tile.Terrain.MOUNTAIN);
-                this.grid[n + 1][n3].yieldIron = 2.0;
-                this.grid[n + 1][n3].yieldGold = 2.0;
-            }
-            if (this.inBounds(n, n3 + 1)) {
-                this.grid[n][n3 + 1] = new Tile(Tile.Terrain.FOREST);
-                this.grid[n][n3 + 1].generateYields(random);
-            }
-            if (n2 == 0 && gameMode != GameMode.AI_VS_AI) {
+            if (n2 == 0) {
                 this.grid[n][n3].isPlayer = true;
             }
             this.units.add(new HQ(n, n3, n2));
-            if (gameMode == GameMode.DEV_MODE && n2 == 1) {
-                this.units.add(new DummyTarget(n, n3 - 1, n2));
-                this.units.add(new DummyTarget(n, n3 + 1, n2));
-                this.units.add(new DummyTarget(n + 1, n3, n2));
-                this.units.add(new DummyTarget(n - 1, n3, n2));
-            } else {
-                this.spawnUnits(n, n3, n2);
-            }
+            this.spawnUnits(n, n3, n2);
         }
         this.updateVision();
     }
@@ -1035,32 +936,25 @@ extends JPanel {
         double d = 32.0 + (double)unit.col * 33.0;
         double d2 = (double)OFFSET_Y + (double)unit.row * ROW_STRIDE + (unit.col % 2 == 1 ? HEX_H / 2.0 : 0.0);
         int n = 8;
-        boolean isBuilder = "Builder".equals(unit.typeName);
-        boolean isSkyShip = unit instanceof SkyShip;
+        boolean bl = "Builder".equals(unit.typeName);
         if (unit == this.selectedUnit) {
             graphics2D.setColor(new Color(255, 215, 0, 150));
-            if (isBuilder) {
+            if (bl) {
                 graphics2D.fillRect((int)(d - (double)n - 4.0), (int)(d2 - (double)n - 4.0), (n + 4) * 2, (n + 4) * 2);
-            } else if (isSkyShip) {
-                graphics2D.fill(buildUnitHexPath(d, d2, n + 4));
             } else {
                 graphics2D.fillOval((int)(d - (double)n - 4.0), (int)(d2 - (double)n - 4.0), (n + 4) * 2, (n + 4) * 2);
             }
         }
         graphics2D.setColor(this.players[unit.ownerIndex].color);
-        if (isBuilder) {
+        if (bl) {
             graphics2D.fillRect((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
-        } else if (isSkyShip) {
-            graphics2D.fill(buildUnitHexPath(d, d2, n));
         } else {
             graphics2D.fillOval((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
         }
         graphics2D.setColor(Color.WHITE);
         graphics2D.setStroke(new BasicStroke(1.5f));
-        if (isBuilder) {
+        if (bl) {
             graphics2D.drawRect((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
-        } else if (isSkyShip) {
-            graphics2D.draw(buildUnitHexPath(d, d2, n));
         } else {
             graphics2D.drawOval((int)(d - (double)n), (int)(d2 - (double)n), n * 2, n * 2);
         }
@@ -1086,7 +980,7 @@ extends JPanel {
             graphics2D.setColor(Color.BLACK);
             graphics2D.drawRect((int)(d - (double)(n2 / 2)), (int)(d2 + (double)n + 2.0), n2, 3);
         }
-        if (unit.ownerIndex == (this.gameMode == GameMode.AI_VS_AI ? this.viewedPlayerIndex : this.currentPlayerIndex) && unit == this.selectedUnit) {
+        if (unit.ownerIndex == this.currentPlayerIndex && unit == this.selectedUnit) {
             object = unit.movesLeft + "/" + unit.maxMoves;
             graphics2D.setFont(new Font("SansSerif", 1, 10));
             graphics2D.drawString((String)object, (int)(d - (double)fontMetrics.stringWidth((String)object) / 2.0) - 2, (int)(d2 - (double)n - 4.0));
@@ -1158,22 +1052,6 @@ extends JPanel {
         return double_;
     }
 
-    private Path2D buildUnitHexPath(double d, double d2, double r) {
-        Path2D.Double double_ = new Path2D.Double();
-        for (int i = 0; i < 6; ++i) {
-            double d3 = Math.toRadians(60 * i);
-            double d4 = d + r * Math.cos(d3);
-            double d5 = d2 + r * Math.sin(d3);
-            if (i == 0) {
-                ((Path2D)double_).moveTo(d4, d5);
-                continue;
-            }
-            ((Path2D)double_).lineTo(d4, d5);
-        }
-        double_.closePath();
-        return double_;
-    }
-
     private int[] pixelToHex(int n, int n2) {
         for (int i = this.visColMin(); i <= this.visColMax(); ++i) {
             for (int j = this.visRowMin(); j <= this.visRowMax(); ++j) {
@@ -1190,33 +1068,6 @@ extends JPanel {
         if (this.isAITurnProcessing) {
             return;
         }
-        
-        if (gameMode == GameMode.AI_VS_AI) {
-            if (this.isPaused) return;
-            this.isAITurnProcessing = true;
-            this.selectedUnit = null;
-            this.currentPath = null;
-            this.repaint();
-            Timer timer = new Timer(500, new ActionListener(){
-                @Override
-                public void actionPerformed(ActionEvent actionEvent) {
-                    while (HexGrid.this.currentPlayerIndex < HexGrid.this.players.length) {
-                        if (HexGrid.this.players[HexGrid.this.currentPlayerIndex].isAI) {
-                            HexGrid.this.aiEngine.processAITurn(HexGrid.this.currentPlayerIndex);
-                        }
-                        ++HexGrid.this.currentPlayerIndex;
-                    }
-                    HexGrid.this.completeTurnCycle();
-                    ((Timer)actionEvent.getSource()).stop();
-                    // trigger next turn again
-                    new Timer(500, e -> HexGrid.this.nextTurn()).start();
-                }
-            });
-            timer.setRepeats(false);
-            timer.start();
-            return;
-        }
-
         ++this.currentPlayerIndex;
         if (this.currentPlayerIndex > 0 && this.currentPlayerIndex < this.players.length) {
             this.isAITurnProcessing = true;
@@ -1226,6 +1077,7 @@ extends JPanel {
             this.isUnloadMode = false;
             this.repaint();
             Timer timer = new Timer(1000, new ActionListener(){
+
                 @Override
                 public void actionPerformed(ActionEvent actionEvent) {
                     while (HexGrid.this.currentPlayerIndex > 0 && HexGrid.this.currentPlayerIndex < HexGrid.this.players.length) {
@@ -1265,6 +1117,7 @@ extends JPanel {
                     unit.currentHp = unit.maxHp;
                 }
             }
+            if (unit.ownerIndex != 0) continue;
             unit.resetMoves();
         }
         this.units.removeAll(arrayList);
@@ -1401,7 +1254,7 @@ extends JPanel {
         int n2;
         int n3;
         String string2;
-        PlayerState playerState = this.players[this.gameMode == GameMode.AI_VS_AI ? this.viewedPlayerIndex : this.currentPlayerIndex];
+        PlayerState playerState = this.players[this.currentPlayerIndex];
         graphics2D.setColor(new Color(0, 0, 0, 180));
         graphics2D.fillRoundRect(10, 10, 220, 85, 10, 10);
         graphics2D.setColor(playerState.color);
@@ -1417,7 +1270,7 @@ extends JPanel {
         graphics2D.drawString("AI Threat Level: " + n4 + "%", 20, 65);
         graphics2D.setColor(Color.WHITE);
         graphics2D.drawString("AI Power: " + string2, 20, 80);
-        PlayerState playerState2 = this.getProjectedYields(this.gameMode == GameMode.AI_VS_AI ? this.viewedPlayerIndex : this.currentPlayerIndex);
+        PlayerState playerState2 = this.getProjectedYields(this.currentPlayerIndex);
         graphics2D.setColor(new Color(0, 0, 0, 180));
         graphics2D.fillRoundRect(240, 10, 500, 50, 10, 10);
         graphics2D.setFont(new Font("Monospaced", 1, 13));
@@ -1475,11 +1328,6 @@ extends JPanel {
             object = "Threat Level: " + n4 + "%";
             graphics2D.setFont(new Font("SansSerif", 0, 14));
             graphics2D.drawString((String)object, n + (n3 - graphics2D.getFontMetrics().stringWidth((String)object)) / 2, 115);
-        }
-        if (this.isPaused && this.gameMode == GameMode.AI_VS_AI) {
-            graphics2D.setColor(Color.YELLOW);
-            graphics2D.setFont(new Font("SansSerif", 1, 36));
-            graphics2D.drawString("PAUSED", 420, 375);
         }
         if (this.selectedCol >= 0) {
             Tile tile = this.grid[this.selectedCol][this.selectedRow];
@@ -1699,13 +1547,11 @@ extends JPanel {
         public double wood;
         public double uranium;
         public double energy;
-        public boolean isAI;
 
-        PlayerState(String string, Color color, boolean isAI) {
+        PlayerState(String string, Color color, boolean bl) {
             this.name = string;
             this.color = color;
-            this.isAI = isAI;
-            double d = isAI ? 3.0 : 1.0;
+            double d = bl ? 3.0 : 1.0;
             this.coal = 100.0 * d;
             this.gold = 100.0 * d;
             this.iron = 100.0 * d;
