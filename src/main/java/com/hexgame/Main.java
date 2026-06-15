@@ -1,57 +1,21 @@
 package com.hexgame;
-
-import javax.swing.*;
-import java.awt.event.KeyEvent;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.*;
+import javax.swing.*; // Imports Java's standard GUI toolkit components
 
 public class Main {
 
-    public static void main(String[] args) {
-        Properties config = new Properties();
-        try (FileInputStream in = new FileInputStream("config.properties")) {
-            config.load(in);
-        } catch (IOException e) {
-            // file missing — use defaults defined in HexGrid
-        }
-
-        int w = Integer.parseInt(config.getProperty("screen.width",  "980"));
-        int h = Integer.parseInt(config.getProperty("screen.height", "750"));
-        HexGrid.setViewSize(w, h);
-
-        HexGrid.setCameraKeys(
-            parseKeys(config.getProperty("camera.up",    "W UP")),
-            parseKeys(config.getProperty("camera.down",  "S DOWN")),
-            parseKeys(config.getProperty("camera.left",  "A LEFT")),
-            parseKeys(config.getProperty("camera.right", "D RIGHT"))
-        );
-
+    public static void main(String[] args) { // The main application entry loop
+        // Always create Swing UI on the Event Dispatch Thread to prevent graphical or threading glitches
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("4X Strategy – Hex Map");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setResizable(false);
+            JFrame frame = new JFrame("4X Strategy – Hex Map"); // Creates the main OS-level window frame with a custom title
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Program fully terminates when clicking the 'X' button
+            frame.setResizable(false); // Disables resizing to keep your specific layout dimensions intact
 
-            HexGrid hexGrid = new HexGrid();
-            frame.add(hexGrid);
+            MainMenu menu = new MainMenu(frame); // Creates the new start menu
+            frame.add(menu); // Attaches the menu layout inside the window frame
 
-            frame.pack();
-            frame.setLocationRelativeTo(null);
-            frame.setVisible(true);
-            hexGrid.requestFocusInWindow();
+            frame.pack(); // Sizes the frame window automatically so the Menu fits with no extra border space
+            frame.setLocationRelativeTo(null); // Centers the completed game window perfectly in the middle of the user's monitor
+            frame.setVisible(true); // Commands the OS to display the window graphically on screen
         });
-    }
-
-    private static Set<Integer> parseKeys(String value) {
-        Set<Integer> result = new HashSet<>();
-        for (String name : value.trim().split("\\s+")) {
-            try {
-                int vk = KeyEvent.class.getField("VK_" + name.toUpperCase()).getInt(null);
-                result.add(vk);
-            } catch (Exception ignored) {
-                System.err.println("Unknown key name in config: " + name);
-            }
-        }
-        return result;
     }
 }
